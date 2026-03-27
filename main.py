@@ -1,178 +1,129 @@
 import streamlit as st
 import math
 
-# --- 1. パスワード設定 ---
-PASSWORD = "7639" 
+# --- 1. パスワードと機種の紐付け ---
+# ここでパスワードと表示する機種を管理します
+PASSWORDS = {
+    "7639": "スマスロ モンキーターンV",
+    "kaba888": "スマスロ 甲鉄城のカバネリ 海門決戦"
+}
 
 def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
+    if "authenticated_machine" not in st.session_state:
+        st.session_state["authenticated_machine"] = None
 
-    if not st.session_state["authenticated"]:
+    if st.session_state["authenticated_machine"] is None:
         st.title("🔑 認証が必要です")
         user_input = st.text_input("パスワードを入力してください", type="password")
         if st.button("ログイン"):
-            if user_input == PASSWORD:
-                st.session_state["authenticated"] = True
+            if user_input in PASSWORDS:
+                st.session_state["authenticated_machine"] = PASSWORDS[user_input]
                 st.rerun()
             else:
                 st.error("パスワードが違います")
-        return False
-    return True
+        return None
+    return st.session_state["authenticated_machine"]
 
-# --- 2. パスワードチェックが成功した時だけ以下を実行 ---
-if check_password():
-    # --- 0. 翻訳対策 & ページ設定 ---
-    st.set_page_config(page_title="期待値算出エンジン Pro", layout="centered")
+# 認証チェック
+target_machine = check_password()
 
-    st.components.v1.html(
-        """
-        <script>
-            window.parent.document.documentElement.setAttribute('lang', 'ja');
-            window.parent.document.documentElement.setAttribute('class', 'notranslate');
-        </script>
-        """,
-        height=0,
-    )
-
-    # --- 1. サイドバー（3列指定表記） ---
+if target_machine:
+    # --- 共通ページ設定 ---
+    st.set_page_config(page_title=f"{target_machine} 算出エンジン", layout="centered")
+    
+    # サイドバー：共通設定
     with st.sidebar:
-        st.header("🎰 機種・ホール設定")
-        machine_select = st.selectbox("ターゲット機種", ["カスタム入力", "スマスロ モンキーターンV"])
-        
-        st.divider()
-
-        monkey_full_data = {
-            "1": {"hit": "1/299.8", "rate": "97.9%",  "h_val": 299.8, "r_val": 97.9},
-            "2": {"hit": "1/295.5", "rate": "98.9%",  "h_val": 295.5, "r_val": 98.9},
-            "3": {"hit": "1/276.5", "rate": "101.0%", "h_val": 276.5, "r_val": 101.0},
-            "4": {"hit": "1/258.8", "rate": "104.5%", "h_val": 258.8, "r_val": 104.5},
-            "5": {"hit": "1/235.7", "rate": "110.2%", "h_val": 235.7, "r_val": 110.2},
-            "6": {"hit": "1/222.9", "rate": "114.9%", "h_val": 222.9, "r_val": 114.9}
-        }
-
-        if machine_select == "スマスロ モンキーターンV":
-            st.subheader("📊 モンキー専用 公表値")
-            selected_setting = st.radio("設定選択", ["1", "2", "3", "4", "5", "6"], horizontal=True)
-            d = monkey_full_data[selected_setting]
-            
-            st.info(f"設定{selected_setting}\n\n初当り\n{d['hit']}\n\n機械割\n{d['rate']}")
-            conf_hit = d['h_val']
-            conf_rate = d['r_val']
-        else:
-            st.subheader("⚙️ 汎用設定")
-            conf_rate = st.number_input("機械割 (%)", value=97.3, step=0.1)
-            conf_hit = st.number_input("公表初当り確率 (1/x)", value=300.0, step=1.0)
-        
-        st.divider()
+        st.header("⚙️ ホール設定")
         kashidashi_mai = st.selectbox("貸出枚数 (1kあたり)", [50, 47, 46], index=2)
         koukan_rate = st.number_input("交換率 (1kあたりの回収枚数)", value=5.2, step=0.1)
+        if st.button("ログアウト"):
+            st.session_state["authenticated_machine"] = None
+            st.rerun()
 
-    st.title(f"🛡️ {machine_select}")
+    # --- A. モンキーターンVの処理 ---
+    if target_machine == "スマスロ モンキーターンV":
+        st.title("🛡️ スマスロ モンキーターンV")
+        
+        # スペックデータ
+        monkey_data = {
+            "1": {"hit": 299.8, "rate": 97.9}, "2": {"hit": 295.5, "rate": 98.9},
+            "3": {"hit": 276.5, "rate": 101.0}, "4": {"hit": 258.8, "rate": 104.5},
+            "5": {"hit": 235.7, "rate": 110.2}, "6": {"hit": 222.9, "rate": 114.9}
+        }
+        
+        setting = st.select_slider("設定選択", options=["1", "2", "3", "4", "5", "6"])
+        conf_hit = monkey_data[setting]["hit"]
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            m_cond = st.radio("状態", ["通常 (795G)", "リセット (495G)"])
+            target_g = 795 if "通常" in m_cond else 495
+            current_g = st.number_input("現在のハマりG", value=0)
+        with col2:
+            rival = st.selectbox("ライバルモード", ["なし", "榎木", "洞口", "蒲生", "浜岡", "青島", "モノクロ"])
+            current_pt = st.number_input("保有pt", value=0)
 
-    # --- 2. 初期値設定 ---
-    d_base = 32.3 if machine_select == "スマスロ モンキーターンV" else 32.0
-    d_target_g = 795
-    d_exp_out = 485
-    d_c1_pt = 222 
-    d_c6_pt = 444
-    d_normal_pt = 100
+        # 簡易計算ロジック
+        ty = 485
+        if rival == "青島": ty = 800
+        elif rival == "モノクロ": ty = 1000
+        
+        rem_g = max(1, target_g - current_g)
+        avg_inv_g = rem_g * 0.8  # 概算
+        inv_mai = (avg_inv_g + 32) * (50 / 32.3)
+        expected_profit = (ty * (100 / koukan_rate)) - ((inv_mai / kashidashi_mai) * 1000)
 
-    # --- 3. モンキー専用：状況選択 ---
-    if machine_select == "スマスロ モンキーターンV":
-        st.subheader("🕵️ モンキー専用：状況選択")
-        m_col1, m_col2 = st.columns(2)
-        with m_col1:
-            m_condition = st.radio("天井設定", ["通常時 (795G)", "リセット (495G)"])
-            d_target_g = 795 if "通常" in m_condition else 495
-            d_target_cycle = 6 if "通常" in m_condition else 4
-        with m_col2:
-            m_rival_full = st.selectbox("状態・ライバル", [
-                "なし", 
-                "榎木 (優出モード期待度50％以上)", 
-                "洞口 (シナリオ　ギャンブラー以上)", 
-                "蒲生 (強チェで超抜チャレンジ濃厚)", 
-                "浜岡 (規定激走最大222pt)", 
-                "青島 (青島SG濃厚)", 
-                "モノクロ波多野 (最強のB2 or 艇王)",
-            ])
-            
-            # 浜岡選択時、全ての周期pt期待値を222に固定
-            if "浜岡" in m_rival_full:
-                d_c1_pt = 222
-                d_c6_pt = 222
-                d_normal_pt = 222
-                
-            if "青島" in m_rival_full: d_exp_out = 800
-            elif "モノクロ" in m_rival_full: d_exp_out = 1000
-        st.divider()
-    else:
-        d_target_cycle = 6
+    # --- B. カバネリ 海門決戦の処理 ---
+    elif target_machine == "スマスロ 甲鉄城のカバネリ 海門決戦":
+        st.markdown("<style>main { background-color: #001f3f; color: white; }</style>", unsafe_allow_html=True)
+        st.title("🛡️ スマスロ 甲鉄城のカバネリ 海門決戦")
 
-    # --- 4. メイン入力 ---
-    st.subheader("📍 現在の状況入力")
-    col1, col2 = st.columns(2)
-    with col1:
-        current_g = st.number_input("現在のハマりG数", value=0, min_value=0)
-        target_g = st.number_input("適用天井G数", value=int(d_target_g))
-    with col2:
-        current_cycle = st.number_input("現在の周期", value=1, min_value=1)
-        target_cycle = st.number_input("天井周期", value=int(d_target_cycle))
+        kaba_data = {
+            "1": {"hit": 254.2, "st": 422.5, "rate": 97.5},
+            "2": {"hit": 242.3, "st": 405.9, "rate": 98.5},
+            "3": {"hit": 239.6, "st": 398.7, "rate": 100.8},
+            "4": {"hit": 214.0, "st": 357.2, "rate": 106.0},
+            "5": {"hit": 203.2, "st": 332.6, "rate": 111.0},
+            "6": {"hit": 195.1, "st": 318.5, "rate": 114.9}
+        }
 
-    st.divider()
-    col3, col4 = st.columns(2)
-    with col3:
-        total_current_g = st.number_input("AT間（累計）現在G", value=0)
-        total_target_g = st.number_input("AT間（累計）天井G", value=0)
-    with col4:
-        current_pt = st.number_input("現在の保有周期pt", value=0)
-        # 周期pt天井の動的切り替え
-        if machine_select == "スマスロ モンキーターンV":
-            if current_cycle == 1:
-                target_pt = st.number_input("1周期目の天井pt", value=int(d_c1_pt))
-            elif current_cycle == target_cycle:
-                target_pt = st.number_input("天井周期の天井pt", value=int(d_c6_pt))
-            else:
-                target_pt = st.number_input("通常周期の天井pt", value=int(d_normal_pt))
-        else:
-            target_pt = st.number_input("通常周期の天井pt", value=int(d_normal_pt))
+        setting = st.select_slider("設定選択", options=["1", "2", "3", "4", "5", "6"])
+        conf_hit = kaba_data[setting]["st"] # ST期待値をベースに計算
 
-    st.divider()
-    final_base = st.number_input("50枚あたりの回転数(G)", value=float(d_base), step=0.1)
-    final_exp_out = st.number_input("期待獲得枚数(TY)", value=int(d_exp_out), step=5)
+        st.subheader("📍 状況選択")
+        k_col1, k_col2 = st.columns(2)
+        with k_col1:
+            state = st.radio("天井条件", ["通常 (996G)", "短縮/リセット (596G)"])
+            target_g = 996 if "通常" in state else 596
+        with k_col2:
+            current_g = st.number_input("現在のハマりG", value=0, min_value=0)
+            bonus_count = st.number_input("駿城スルー回数", value=0, min_value=0)
 
-    # --- 5. 計算ロジック ---
-    limit_rem_g = max(1, target_g - current_g)
-    base_prob = 1 / conf_hit
+        # カバネリ専用ロジック
+        base = 31.0
+        ty = 450 # 通常ST平均
+        
+        # ゾーン期待度補正 (150G, 300G付近のブースト)
+        boost = 1.0
+        if current_g < 150: boost = 1.2
+        elif current_g < 300: boost = 1.1
 
-    if limit_rem_g > 600: effective_prob = base_prob * 0.9
-    elif limit_rem_g > 400: effective_prob = base_prob * 1.1
-    elif limit_rem_g > 200: effective_prob = base_prob * 1.5
-    elif limit_rem_g > 100: effective_prob = base_prob * 2.5
-    else: effective_prob = base_prob * 5.0
+        rem_g = max(1, target_g - current_g)
+        # 天井考慮の平均消化G数
+        avg_rem_g = (rem_g * 0.75) / boost
+        
+        inv_mai = (avg_rem_g + 25) * (50 / base)
+        inv_yen = (inv_mai / kashidashi_mai) * 1000
+        out_yen = ty * (100 / koukan_rate)
+        expected_profit = out_yen - inv_yen
 
-    p = effective_prob
-    n = limit_rem_g
-    avg_rem_g = (1/p) * (1 - math.pow(1 - p, n)) if p > 0 else n
-
-    pt_factor = current_pt / target_pt if target_pt > 0 else 0
-    if machine_select == "スマスロ モンキーターンV":
-        avg_rem_g = avg_rem_g * (1 - (pt_factor * 0.35))
-
-    internal_avg_g = avg_rem_g + 32 
-    inv_mai = internal_avg_g * (50 / final_base)
-    inv_yen = (inv_mai / kashidashi_mai) * 1000
-    out_yen = final_exp_out * (100 / koukan_rate)
-    expected_profit = out_yen - inv_yen
-
-    # --- 6. 結果表示 ---
+    # --- 結果表示 (共通) ---
     st.divider()
     if expected_profit >= 0:
         st.success(f"期待収支: ＋{math.floor(expected_profit):,} 円")
     else:
         st.error(f"期待収支: {math.floor(expected_profit):,} 円")
-
-    res1, res2, res3 = st.columns(3)
-    with res1: st.metric("天井まで残り", f"{limit_rem_g} G")
-    with res2: st.metric("天井到達枚数", f"{math.ceil((limit_rem_g+32)*(50/final_base))} 枚")
-    with res3: st.metric("最大投資額", f"{math.ceil(math.ceil((limit_rem_g+32)*(50/final_base))/kashidashi_mai)*1000:,} 円")
+    
+    res1, res2 = st.columns(2)
+    res1.metric("天井まで残り", f"{target_g - current_g} G")
+    res2.metric("最大投資額", f"{math.ceil(math.ceil((target_g - current_g + 25)*(50/31))/kashidashi_mai)*1000:,} 円")

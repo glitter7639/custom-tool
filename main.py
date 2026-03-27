@@ -1,4 +1,28 @@
 import streamlit as st
+
+# --- パスワード設定 ---
+PASSWORD = "7639"  # ←ここを好きなパスワードに変えてください
+
+def check_password():
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+
+    if not st.session_state["authenticated"]:
+        st.title("🔑 認証が必要です")
+        user_input = st.text_input("パスワードを入力してください", type="password")
+        if st.button("ログイン"):
+            if user_input == PASSWORD:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("パスワードが違います")
+        return False
+    return True
+
+# パスワードチェックを実行
+if check_password():
+    # --- ここから下に、元々あった計算機のコードを続けてください ---
+    st.success("ログイン成功！")import streamlit as st
 import math
 
 # --- 0. 翻訳対策 & ページ設定 ---

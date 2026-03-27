@@ -156,3 +156,23 @@ if check_password():
     avg_rem_g = (1/p) * (1 - math.pow(1 - p, n)) if p > 0 else n
 
     pt_factor = current_pt / target_pt if target_pt > 0 else 0
+    if machine_select == "スマスロ モンキーターンV":
+        avg_rem_g = avg_rem_g * (1 - (pt_factor * 0.35))
+
+    internal_avg_g = avg_rem_g + 32 
+    inv_mai = internal_avg_g * (50 / final_base)
+    inv_yen = (inv_mai / kashidashi_mai) * 1000
+    out_yen = final_exp_out * (100 / koukan_rate)
+    expected_profit = out_yen - inv_yen
+
+    # --- 6. 結果表示 ---
+    st.divider()
+    if expected_profit >= 0:
+        st.success(f"期待収支: ＋{math.floor(expected_profit):,} 円")
+    else:
+        st.error(f"期待収支: {math.floor(expected_profit):,} 円")
+
+    res1, res2, res3 = st.columns(3)
+    with res1: st.metric("天井まで残り", f"{limit_rem_g} G")
+    with res2: st.metric("天井到達枚数", f"{math.ceil((limit_rem_g+32)*(50/final_base))} 枚")
+    with res3: st.metric("最大投資額", f"{math.ceil(math.ceil((limit_rem_g+32)*(50/final_base))/kashidashi_mai)*1000:,} 円")

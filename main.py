@@ -25,7 +25,7 @@ with st.sidebar:
     
     # 将来的に各機種の鍵付きURLへ飛ばすリンク
     st.markdown("🔒 [スマスロ モンキーターンV](https://monkey-calc-6vnsqp7zjzewrzrhzh7kr7.streamlit.app/)")
-    st.markdown("🔒 [L甲鉄城のカバネリ](https://kabaneri-calc-bplugvhqvwesoebuwnq6gm.streamlit.app/)")
+    st.markdown("🔒 [甲鉄城のカバネリ 海門決戦](https://kabaneri-calc-bplugvhqvwesoebuwnq6gm.streamlit.app/)")
     
     st.divider()
     st.subheader("🏢 ホール設定")
